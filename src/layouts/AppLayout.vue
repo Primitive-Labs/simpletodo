@@ -12,7 +12,7 @@
 import AppSidebar from "@/components/AppSidebar.vue";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useMediaQuery } from "@vueuse/core";
-import { Home, Key, User, Search, ListTodo } from "lucide-vue-next";
+import { Key, User, Search, ListTodo, CheckSquare, LogOut } from "lucide-vue-next";
 import EditProfile from "@/components/auth/EditProfile.vue";
 import PasskeyManagement from "@/components/auth/PasskeyManagement.vue";
 import PrimitiveMobileTabBar, {
@@ -24,20 +24,74 @@ import PrimitiveUserTabItem, {
 } from "@/components/shared/PrimitiveUserTabItem.vue";
 import { useUserStore } from "@/stores/userStore";
 import { useTodoStore } from "@/stores/todoStore";
+import { TodoList } from "@/models";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useJsBaoDataLoader } from "@/composables/useJsBaoDataLoader";
 
 const isMobile = useMediaQuery("(max-width: 768px)");
-
-// Bottom tab bar items - customize these for your app
-const mobileNavItems: TabBarItem[] = [
-  { name: "home", label: "Home", icon: Home, path: "/" },
-  { name: "search", label: "Search", icon: Search, path: "/search" },
-  { name: "lists", label: "Lists", icon: ListTodo, path: "/lists" },
-];
 
 // User store for mobile user menu
 const userStore = useUserStore();
 const todoStore = useTodoStore();
+
+// Load recent lists for mobile navigation
+const documentReady = computed(() => todoStore.isCollectionReady);
+const recentListIds = computed(() => todoStore.getRecentListIds());
+
+interface RecentListData {
+  lists: Array<{ id: string; title: string }>;
+}
+
+const { data: recentListsData } = useJsBaoDataLoader<
+  RecentListData,
+  { listIds: string[] }
+>({
+  subscribeTo: [TodoList],
+  queryParams: computed(() => ({
+    listIds: recentListIds.value,
+  })),
+  documentReady,
+  async loadData({ queryParams }) {
+    const listIds = queryParams?.listIds ?? [];
+    if (listIds.length === 0) {
+      return { lists: [] };
+    }
+
+    const result = await TodoList.query({ id: { $in: listIds } });
+    // Preserve order from recentListIds
+    const listsById = new Map(result.data.map((l) => [l.id, l]));
+    const lists = listIds
+      .map((id) => {
+        const list = listsById.get(id);
+        return list ? { id: list.id, title: list.title } : null;
+      })
+      .filter((l): l is { id: string; title: string } => l !== null);
+
+    return { lists };
+  },
+});
+
+// Dynamic mobile nav items with recent lists
+const mobileNavItems = computed<TabBarItem[]>(() => {
+  const items: TabBarItem[] = [];
+
+  // Add the most recently used list
+  const recentLists = recentListsData.value?.lists ?? [];
+  for (const list of recentLists.slice(0, 1)) {
+    items.push({
+      name: `list-${list.id}`,
+      label: list.title.length > 10 ? list.title.slice(0, 9) + "…" : list.title,
+      icon: CheckSquare,
+      path: `/list/${list.id}`,
+    });
+  }
+
+  // Always show Search and Lists
+  items.push({ name: "search", label: "Search", icon: Search, path: "/search" });
+  items.push({ name: "lists", label: "Lists", icon: ListTodo, path: "/lists" });
+
+  return items;
+});
 
 // Initialize todoStore when authenticated
 watch(
@@ -61,6 +115,7 @@ const mobileUserInfo = computed<UserTabUserInfo>(() => ({
 const mobileMenuItems: UserTabMenuItem[] = [
   { id: "edit-profile", label: "Edit Profile", icon: User },
   { id: "passkey-management", label: "Manage Passkeys", icon: Key },
+  { id: "logout", label: "Log Out", icon: LogOut },
 ];
 
 function handleMobileMenuItemClick(itemId: string): void {
@@ -68,6 +123,8 @@ function handleMobileMenuItemClick(itemId: string): void {
     handleOpenEditProfile();
   } else if (itemId === "passkey-management") {
     handleOpenPasskeyManagement();
+  } else if (itemId === "logout") {
+    userStore.logout();
   }
 }
 

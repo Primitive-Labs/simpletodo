@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import { Search, ArrowLeft, ListTodo, Eye, EyeOff } from "lucide-vue-next";
+import { Search, ListTodo, Eye, EyeOff } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -92,10 +92,6 @@ const resultCount = computed(() => {
   return pendingResults.value.length;
 });
 
-function handleBack(): void {
-  router.push({ name: "home" });
-}
-
 function handleResultClick(listId: string): void {
   router.push({ name: "todo-list", params: { listId } });
 }
@@ -117,10 +113,15 @@ function highlightMatch(text: string, query: string): string {
   <div class="space-y-4">
     <!-- Header -->
     <div class="flex items-center gap-2">
-      <Button variant="ghost" size="icon" class="sm:hidden" @click="handleBack">
-        <ArrowLeft class="h-4 w-4" />
+      <h1 class="text-xl font-semibold flex-1">Search</h1>
+      <Button
+        variant="ghost"
+        size="icon"
+        :title="showCompleted ? 'Hide completed' : 'Show completed'"
+        @click="showCompleted = !showCompleted"
+      >
+        <component :is="showCompleted ? EyeOff : Eye" class="h-4 w-4" />
       </Button>
-      <h1 class="text-xl font-semibold">Search</h1>
     </div>
 
     <!-- Search Input -->
@@ -134,19 +135,6 @@ function highlightMatch(text: string, query: string): string {
         class="pl-10"
         autofocus
       />
-    </div>
-
-    <!-- Show Completed Toggle -->
-    <div class="flex items-center">
-      <Button
-        variant="ghost"
-        size="sm"
-        :title="showCompleted ? 'Hide completed' : 'Show completed'"
-        @click="showCompleted = !showCompleted"
-      >
-        <component :is="showCompleted ? EyeOff : Eye" class="h-4 w-4 mr-2" />
-        {{ showCompleted ? "Hide completed" : "Show completed" }}
-      </Button>
     </div>
 
     <!-- Results -->

@@ -26,6 +26,7 @@ const COLLECTION_NAME = "todolists";
 const COLLECTION_TAG = "todolist";
 const DEFAULT_LIST_ALIAS = "default-list";
 const LAST_USED_LIST_PREF = "lastUsedListId";
+const RECENT_LISTS_PREF = "recentListIds";
 
 let initStarted = false;
 
@@ -359,6 +360,27 @@ export const useTodoStore = defineStore("todo", () => {
   async function setLastUsedListId(listId: string): Promise<void> {
     logger.debug("Setting last used list", { listId });
     await userStore.setPref(LAST_USED_LIST_PREF, listId);
+    // Also update recent lists
+    await addToRecentLists(listId);
+  }
+
+  /**
+   * Get the recent list IDs (up to 2) from user preferences.
+   */
+  function getRecentListIds(): string[] {
+    return userStore.getPref<string[]>(RECENT_LISTS_PREF, []);
+  }
+
+  /**
+   * Add a list ID to the recent lists, keeping only the most recent 2.
+   */
+  async function addToRecentLists(listId: string): Promise<void> {
+    const current = getRecentListIds();
+    // Remove if already exists, then add to front
+    const filtered = current.filter((id) => id !== listId);
+    const updated = [listId, ...filtered].slice(0, 2);
+    logger.debug("Updating recent lists", { listId, updated });
+    await userStore.setPref(RECENT_LISTS_PREF, updated);
   }
 
   /**
@@ -518,6 +540,7 @@ export const useTodoStore = defineStore("todo", () => {
     // Last used list & default list
     getLastUsedListId,
     setLastUsedListId,
+    getRecentListIds,
     getOrCreateDefaultList,
     getStartupListId,
 

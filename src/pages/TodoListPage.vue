@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { ArrowLeft, Share2, Eye, EyeOff } from "lucide-vue-next";
+import { Share2, Eye, EyeOff } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import PrimitiveLoadingGate from "@/components/shared/PrimitiveLoadingGate.vue";
@@ -105,10 +105,6 @@ watch(
   { immediate: true }
 );
 
-function handleBack(): void {
-  router.push({ name: "home" });
-}
-
 async function handleAddTodo(text: string): Promise<void> {
   if (!currentList.value || !currentDocumentId.value) return;
   await todoStore.addTodo(currentList.value.id, text, currentDocumentId.value);
@@ -150,10 +146,6 @@ function isItemCompleting(itemId: string): boolean {
   <div class="flex flex-col h-full">
     <!-- Header -->
     <div class="flex items-center gap-2 pb-4 border-b">
-      <Button variant="ghost" size="icon" @click="handleBack">
-        <ArrowLeft class="h-4 w-4" />
-      </Button>
-
       <div class="flex-1">
         <PrimitiveLoadingGate :is-ready="initialDataLoaded">
           <template #loading>

@@ -42,7 +42,9 @@ function startEditing(): void {
   isEditing.value = true;
   editText.value = props.text;
   nextTick(() => {
-    const input = inputRef.value?.$el?.querySelector("input") as HTMLInputElement;
+    const input = inputRef.value?.$el?.querySelector(
+      "input"
+    ) as HTMLInputElement;
     input?.focus();
     input?.select();
   });
