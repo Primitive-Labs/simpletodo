@@ -170,6 +170,37 @@ await Promise.all(
 const messages = await Message.query({});
 ```
 
+**Using multiDocumentStore:** For Pattern 3, the `multiDocumentStore` Pinia store provides a higher-level abstraction that handles:
+- Registering collections by tag with automatic document opening (`autoOpen: true`)
+- Tracking which documents belong to which collection
+- Optional auto-acceptance of invitations (`autoAcceptInvites: true/false`)
+- Proper document creation that ensures documents are opened and tracked
+
+```typescript
+// Register a collection (typically in a domain store's initialize function)
+await multiDocStore.registerCollection({
+  name: "todolists",
+  tag: "todolist",
+  autoOpen: true,        // Automatically open documents with this tag
+  autoAcceptInvites: false, // Require manual invitation acceptance
+});
+
+// Create a document in the collection - ALWAYS use this, not documentsStore directly
+const trackedDoc = await multiDocStore.createDocument(
+  "todolists",  // collection name
+  "My List",    // title
+  { alias: { scope: "user", aliasKey: "default-list" } } // optional alias
+);
+
+// The document is automatically opened and tracked
+// Now you can save models to it
+const list = new TodoList();
+list.title = "My List";
+await list.save({ targetDocument: trackedDoc.documentId });
+```
+
+**Critical:** When working with multiDocumentStore collections, ALWAYS use `multiDocStore.createDocument()` to create new documents. Using `documentsStore.createDocumentWithAlias()` or other low-level methods bypasses the collection's auto-open and tracking logic, causing documents to not appear in reactive lists.
+
 ## Data Modeling Decisions
 
 ### Separate Documents When:
@@ -532,6 +563,69 @@ try {
 - `documents.createWithAlias(options)` - Create document with alias atomically
 - `documents.openAlias(params)` - Open document by alias directly
 
+## Sharing Documents
+
+### Using PrimitiveShareDocumentDialog
+
+When allowing users to share documents, use `PrimitiveShareDocumentDialog`:
+
+```vue
+<PrimitiveShareDocumentDialog
+  :is-open="showShareDialog"
+  :document-id="currentDocumentId"
+  :document-label="currentList?.title ?? 'Document'"
+  :invite-url-template="`${window.location.origin}/lists`"
+  @close="showShareDialog = false"
+/>
+```
+
+**Critical:** The `invite-url-template` prop is REQUIRED when users send email notifications. Without it, the API returns HTTP 400. The URL should point to a page where invited users can see and accept their invitations.
+
+### Handling Invitations
+
+**Auto-accept vs Manual:**
+- `autoAcceptInvites: true` - Invitations are automatically accepted when the document tag matches a registered collection. Documents appear immediately in the user's list.
+- `autoAcceptInvites: false` - Users must manually accept invitations on a management page. Provides more control but requires UI for viewing/accepting invitations.
+
+**Navigating after accepting an invitation:**
+
+When a user accepts an invitation, you typically want to navigate them to the content. Since routes use model IDs (not document IDs), query for the model first:
+
+```typescript
+async function handleInvitationAccepted(documentId: string): Promise<void> {
+  // Brief delay for document to sync after acceptance
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
+  // Query for the model in the newly accessible document
+  const result = await TodoList.query({}, { documents: documentId });
+  const list = result.data[0];
+  if (list) {
+    router.push({ name: "todo-list", params: { listId: list.id } });
+  }
+}
+```
+
+### Read-Only Permission Handling
+
+When a user has "reader" permission, disable all edit functionality:
+
+```typescript
+const isReadOnly = computed(() => {
+  if (!currentDocumentId.value) return true;
+  const doc = todoStore.todoListDocuments.find(
+    (d) => d.documentId === currentDocumentId.value
+  );
+  return doc?.permission === "reader";
+});
+```
+
+Pass `isReadOnly` to child components and use it to:
+- Hide create/add buttons (`v-if="!isReadOnly"`)
+- Hide delete buttons and drag handles
+- Disable checkboxes and inputs (`:disabled="isReadOnly"`)
+- Hide share buttons (only owners can share)
+- Prevent inline editing
+
 ## Common Errors
 
 | Symptom                                         | Cause                                                                    | Fix                                                                                                  |
@@ -539,3 +633,7 @@ try {
 | Need document from item                         | N/A                                                                      | Use `item.getDocumentId()`                                                                           |
 | Data doesn't update when route param changes    | Vue reuses components; `useJsBaoDataLoader` doesn't see the change       | Add the route param to `queryParams` in the data loader, OR use `:key="routeParam"` on the component |
 | Spread object missing data or reactivity broken | js-bao model objects don't support JavaScript spreading (`{ ...model }`) | Access properties directly or use explicit property copying: `{ id: model.id, title: model.title }`  |
+| Query `field: false` misses items               | Items with `field: undefined` don't match `field: false`                 | Use a default value in schema, OR filter in JavaScript with `item.field ?? false`                    |
+| Document created but not in sidebar/list        | Used `documentsStore` directly instead of `multiDocStore`                | Always use `multiDocStore.createDocument()` when working with collections                            |
+| HTTP 400 when sharing with email                | Missing `documentUrl` in invitation                                       | Pass `invite-url-template` prop to `PrimitiveShareDocumentDialog`                                    |
+| New document not queryable immediately          | Document not opened after creation                                        | Use `multiDocStore.createDocument()` which handles opening automatically                             |

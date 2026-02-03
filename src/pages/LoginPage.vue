@@ -118,7 +118,7 @@ const autoplayPlugin = Autoplay({
     <!-- Login form section -->
     <aside class="w-full lg:basis-5/12">
       <PrimitiveLogin
-        appName="Primitive Template App"
+        appName="Simpletodo"
         defaultContinueRoute="home"
         emailAuthMethod="magic_link"
       >
@@ -130,7 +130,7 @@ const autoplayPlugin = Autoplay({
               >
                 <AppIcon class="size-6" />
               </div>
-              Primitive Template App
+              Simpletodo
             </a>
           </div>
         </template>

@@ -12,7 +12,7 @@
 import AppSidebar from "@/components/AppSidebar.vue";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useMediaQuery } from "@vueuse/core";
-import { Home, Key, User } from "lucide-vue-next";
+import { Home, Key, User, Search, ListTodo } from "lucide-vue-next";
 import EditProfile from "@/components/auth/EditProfile.vue";
 import PasskeyManagement from "@/components/auth/PasskeyManagement.vue";
 import PrimitiveMobileTabBar, {
@@ -23,17 +23,34 @@ import PrimitiveUserTabItem, {
   type UserTabUserInfo,
 } from "@/components/shared/PrimitiveUserTabItem.vue";
 import { useUserStore } from "@/stores/userStore";
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { useTodoStore } from "@/stores/todoStore";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 const isMobile = useMediaQuery("(max-width: 768px)");
 
 // Bottom tab bar items - customize these for your app
 const mobileNavItems: TabBarItem[] = [
   { name: "home", label: "Home", icon: Home, path: "/" },
+  { name: "search", label: "Search", icon: Search, path: "/search" },
+  { name: "lists", label: "Lists", icon: ListTodo, path: "/lists" },
 ];
 
 // User store for mobile user menu
 const userStore = useUserStore();
+const todoStore = useTodoStore();
+
+// Initialize todoStore when authenticated
+watch(
+  () => userStore.isAuthenticated,
+  (isAuthenticated) => {
+    if (isAuthenticated) {
+      todoStore.initialize();
+    } else {
+      todoStore.reset();
+    }
+  },
+  { immediate: true }
+);
 
 const mobileUserInfo = computed<UserTabUserInfo>(() => ({
   name: userStore.currentUser?.name ?? "User",

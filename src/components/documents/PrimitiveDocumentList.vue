@@ -110,6 +110,10 @@ interface Emits {
    * Emitted when user clicks on a document row.
    */
   (e: "document-click", documentId: string, title: string): void;
+  /**
+   * Emitted when user accepts an invitation.
+   */
+  (e: "invitation-accepted", documentId: string): void;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -261,17 +265,11 @@ const documentItems = computed(() => {
  * Filtered and sorted invitation items.
  */
 const invitationItems = computed(() => {
+  // Always show all invitations - we don't have tag info for pending invitations
+  // so we can't filter them. Users can decline if the invitation isn't relevant.
   return (pendingInvitations.value || [])
     .filter((inv): inv is PendingInvitation & { documentId: string } => {
       return Boolean(inv && inv.documentId);
-    })
-    .filter((inv) => {
-      // Invitations may not have tags, so include them if no filter is set
-      if (!props.filterTags || props.filterTags.length === 0) {
-        return true;
-      }
-      // If the invitation has document metadata with tags, filter by those
-      return false; // Invitations without tag info are excluded when filtering
     })
     .map((inv) => {
       return {
@@ -344,6 +342,8 @@ const handleAcceptInvitation = async (documentId: string) => {
     await client.documents.acceptInvitation(documentId);
     // Refresh both lists after accepting
     await Promise.all([loadDocuments(), loadInvitations()]);
+    // Notify parent that invitation was accepted
+    emit("invitation-accepted", documentId);
   } catch (error) {
     logger.error("Failed to accept invitation", { error });
   } finally {
