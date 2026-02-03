@@ -1,9 +1,25 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { Share2, Eye, EyeOff } from "lucide-vue-next";
+import { Share2, Eye, EyeOff, Trash2 } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { useMediaQuery } from "@vueuse/core";
+import { jsBaoClientService } from "primitive-app";
 import PrimitiveLoadingGate from "@/components/shared/PrimitiveLoadingGate.vue";
 import PrimitiveShareDocumentDialog from "@/components/documents/PrimitiveShareDocumentDialog.vue";
 import TodoInput from "@/components/todos/TodoInput.vue";
@@ -21,8 +37,11 @@ interface LoadedData {
 const route = useRoute();
 const router = useRouter();
 const todoStore = useTodoStore();
+const isMobile = useMediaQuery("(max-width: 640px)");
 
 const showShareDialog = ref(false);
+const showDeleteSheet = ref(false);
+const isDeleting = ref(false);
 const pauseUpdates = ref(false);
 
 // URL template for share invitations - links to manage lists page where user can accept
@@ -83,6 +102,14 @@ const isReadOnly = computed(() => {
   return doc?.permission === "reader";
 });
 
+const isOwner = computed(() => {
+  if (!currentDocumentId.value) return false;
+  const doc = todoStore.todoListDocuments.find(
+    (d) => d.documentId === currentDocumentId.value
+  );
+  return doc?.permission === "owner";
+});
+
 // Redirect if list not found after loading
 watch(
   [initialDataLoaded, currentList],
@@ -140,6 +167,23 @@ async function handleToggleShowCompleted(): Promise<void> {
 function isItemCompleting(itemId: string): boolean {
   return todoStore.isItemCompleting(itemId);
 }
+
+async function handleDeleteList(): Promise<void> {
+  if (!currentDocumentId.value || isDeleting.value) return;
+
+  isDeleting.value = true;
+  try {
+    const client = await jsBaoClientService.getClientAsync();
+    const docId = currentDocumentId.value;
+    // Close the document first, then delete it
+    await client.documents.close(docId);
+    await client.documents.delete(docId);
+    showDeleteSheet.value = false;
+    router.replace({ name: "home" });
+  } finally {
+    isDeleting.value = false;
+  }
+}
 </script>
 
 <template>
@@ -163,9 +207,21 @@ function isItemCompleting(itemId: string): boolean {
           v-if="!isReadOnly"
           variant="ghost"
           size="icon"
+          title="Share list"
           @click="showShareDialog = true"
         >
           <Share2 class="h-4 w-4" />
+        </Button>
+
+        <Button
+          v-if="isOwner"
+          variant="ghost"
+          size="icon"
+          class="text-destructive hover:text-destructive"
+          title="Delete list"
+          @click="showDeleteSheet = true"
+        >
+          <Trash2 class="h-4 w-4" />
         </Button>
 
         <Button
@@ -218,5 +274,83 @@ function isItemCompleting(itemId: string): boolean {
       :invite-url-template="inviteUrlTemplate"
       @close="showShareDialog = false"
     />
+
+    <!-- Delete Confirmation Dialog (desktop) -->
+    <Dialog
+      v-if="!isMobile"
+      :open="showDeleteSheet"
+      @update:open="(val) => !val && !isDeleting && (showDeleteSheet = false)"
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete List</DialogTitle>
+        </DialogHeader>
+        <div class="space-y-2">
+          <p>
+            Are you sure you want to delete "{{ currentList?.title }}"?
+          </p>
+          <p class="text-sm text-destructive">
+            Warning: This will permanently delete the list and all its items.
+            This action cannot be undone.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            :disabled="isDeleting"
+            @click="!isDeleting && (showDeleteSheet = false)"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            :disabled="isDeleting"
+            @click="handleDeleteList"
+          >
+            {{ isDeleting ? "Deleting..." : "Delete List" }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Delete Confirmation Sheet (mobile) -->
+    <Sheet
+      v-if="isMobile"
+      :open="showDeleteSheet"
+      @update:open="(val) => !val && !isDeleting && (showDeleteSheet = false)"
+    >
+      <SheetContent side="bottom">
+        <SheetHeader>
+          <SheetTitle>Delete List</SheetTitle>
+        </SheetHeader>
+        <div class="px-4 py-4 space-y-2">
+          <p>
+            Are you sure you want to delete "{{ currentList?.title }}"?
+          </p>
+          <p class="text-sm text-destructive">
+            Warning: This will permanently delete the list and all its items.
+            This action cannot be undone.
+          </p>
+        </div>
+        <SheetFooter class="flex-col gap-2 sm:flex-col px-4">
+          <Button
+            variant="destructive"
+            class="w-full"
+            :disabled="isDeleting"
+            @click="handleDeleteList"
+          >
+            {{ isDeleting ? "Deleting..." : "Delete List" }}
+          </Button>
+          <Button
+            variant="outline"
+            class="w-full"
+            :disabled="isDeleting"
+            @click="showDeleteSheet = false"
+          >
+            Cancel
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   </div>
 </template>
