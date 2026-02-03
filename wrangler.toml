@@ -10,7 +10,7 @@
 # To deploy: pnpm cf-deploy production
 # =============================================================================
 
-name = "YOUR APP NAME HERE"
+name = "simpletodo"
 main = "worker.js"
 compatibility_date = "2025-06-12"
 
@@ -26,13 +26,11 @@ not_found_handling = "single-page-application"
 # Config from: .env.production
 # =============================================================================
 [env.production]
-name = "YOUR APP NAME HERE-prod"
+name = "simpletodo-prod"
 
-# By default, deploys to: YOUR APP NAME HERE-prod.<your-subdomain>.workers.dev
-# Uncomment below to use a custom domain instead:
-# [[env.production.routes]]
-# pattern = "your-domain.com"
-# custom_domain = true
+[[env.production.routes]]
+pattern = "simpletodo.primitive.app"
+custom_domain = true
 
 [env.production.vars]
 # Auth proxy cookie settings (worker-specific)
