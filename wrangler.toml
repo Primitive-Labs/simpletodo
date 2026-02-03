@@ -1,0 +1,59 @@
+# =============================================================================
+# WRANGLER CONFIGURATION
+# =============================================================================
+# Worker and deployment configuration for Cloudflare Workers.
+#
+# App configuration (APP_ID, API_ORIGIN) comes from .env files and is
+# passed to the worker at deploy time via --var flags. This keeps all app
+# config in .env files for consistency between development and production.
+#
+# To deploy: pnpm cf-deploy production
+# =============================================================================
+
+name = "YOUR APP NAME HERE"
+main = "worker.js"
+compatibility_date = "2025-06-12"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# =============================================================================
+# PRODUCTION ENVIRONMENT
+# =============================================================================
+# Deploy with: pnpm cf-deploy production
+# Config from: .env.production
+# =============================================================================
+[env.production]
+name = "YOUR APP NAME HERE-prod"
+
+# By default, deploys to: YOUR APP NAME HERE-prod.<your-subdomain>.workers.dev
+# Uncomment below to use a custom domain instead:
+# [[env.production.routes]]
+# pattern = "your-domain.com"
+# custom_domain = true
+
+[env.production.vars]
+# Auth proxy cookie settings (worker-specific)
+REFRESH_PROXY_COOKIE_MAX_AGE = "604800"
+REFRESH_PROXY_COOKIE_PATH = "/proxy/"
+
+# Note: APP_ID and API_ORIGIN are read from .env.production by the deploy script
+# and passed to wrangler via --var flags. Do not duplicate them here.
+
+# =============================================================================
+# ADDITIONAL ENVIRONMENTS
+# =============================================================================
+# To add a test environment:
+#
+# 1. Add a section here:
+#    [env.test]
+#    name = "YOUR APP NAME HERE-test"
+#    [env.test.vars]
+#    REFRESH_PROXY_COOKIE_MAX_AGE = "604800"
+#    REFRESH_PROXY_COOKIE_PATH = "/proxy/"
+#
+# 2. Create .env.test with your test configuration
+#
+# 3. Deploy with: pnpm cf-deploy test
