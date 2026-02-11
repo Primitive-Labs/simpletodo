@@ -10,6 +10,7 @@
  * This layout demonstrates a simple responsive pattern that apps can customize.
  */
 import AppSidebar from "@/components/AppSidebar.vue";
+import TrialBanner from "@/components/shared/TrialBanner.vue";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useMediaQuery } from "@vueuse/core";
 import { Key, User, Search, ListTodo, CheckSquare, LogOut } from "lucide-vue-next";
@@ -22,17 +23,22 @@ import PrimitiveUserTabItem, {
   type UserTabMenuItem,
   type UserTabUserInfo,
 } from "@/components/shared/PrimitiveUserTabItem.vue";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useUserStore } from "@/stores/userStore";
 import { useTodoStore } from "@/stores/todoStore";
 import { TodoList } from "@/models";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useJsBaoDataLoader } from "@/composables/useJsBaoDataLoader";
+import { useRouter, useRoute } from "vue-router";
 
 const isMobile = useMediaQuery("(max-width: 768px)");
+const router = useRouter();
+const route = useRoute();
 
 // User store for mobile user menu
 const userStore = useUserStore();
 const todoStore = useTodoStore();
+const subscriptionStore = useSubscriptionStore();
 
 // Load recent lists for mobile navigation
 const documentReady = computed(() => todoStore.isCollectionReady);
@@ -93,17 +99,29 @@ const mobileNavItems = computed<TabBarItem[]>(() => {
   return items;
 });
 
-// Initialize todoStore when authenticated
+// Initialize todoStore and check subscription when authenticated
 watch(
   () => userStore.isAuthenticated,
   (isAuthenticated) => {
     if (isAuthenticated) {
       todoStore.initialize();
+      subscriptionStore.checkStatus();
     } else {
       todoStore.reset();
+      subscriptionStore.reset();
     }
   },
   { immediate: true }
+);
+
+// Redirect to subscribe page when subscription expires (handles async check completion)
+watch(
+  () => subscriptionStore.shouldShowPaywall,
+  (shouldShowPaywall) => {
+    if (shouldShowPaywall && route.name !== "subscribe") {
+      router.replace({ name: "subscribe" });
+    }
+  }
 );
 
 const mobileUserInfo = computed<UserTabUserInfo>(() => ({
@@ -155,6 +173,19 @@ function onKeyDown(e: KeyboardEvent): void {
 }
 
 onMounted(() => {
+  // Handle return from Stripe Checkout: clean URL and re-check subscription
+  const searchParams = new URLSearchParams(window.location.search);
+  if (searchParams.has("checkout")) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("checkout");
+    window.history.replaceState({}, "", url.toString());
+
+    if (searchParams.get("checkout") === "success") {
+      // Give the webhook a moment to process before re-checking
+      setTimeout(() => subscriptionStore.checkStatus(), 2000);
+    }
+  }
+
   try {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
       swDisconnected.value = false;
@@ -200,6 +231,9 @@ onBeforeUnmount(() => {
     >
       Update required: Click to refresh
     </div>
+
+    <!-- Trial countdown banner -->
+    <TrialBanner />
 
     <div :class="{ 'pt-10': swDisconnected }">
       <!-- Desktop: Collapsible sidebar with SidebarProvider -->

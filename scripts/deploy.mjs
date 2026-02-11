@@ -67,6 +67,8 @@ function parseEnvFile(filePath) {
 const ENV_TO_WRANGLER_VARS = {
   VITE_APP_ID: "APP_ID",
   VITE_API_URL: "API_ORIGIN",
+  STRIPE_PRICE_ID: "STRIPE_PRICE_ID",
+  APP_URL: "APP_URL",
 };
 
 /**

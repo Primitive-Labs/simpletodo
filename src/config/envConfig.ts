@@ -12,6 +12,7 @@ export const config = {
   enableAuthProxy: import.meta.env.VITE_ENABLE_AUTH_PROXY === "true",
   logLevel: import.meta.env.VITE_LOG_LEVEL,
   baseUrl: import.meta.env.VITE_BASE_URL,
+  billingEnabled: import.meta.env.VITE_BILLING_ENABLED === "true",
 };
 
 function getRefreshProxyBaseUrl(): string {

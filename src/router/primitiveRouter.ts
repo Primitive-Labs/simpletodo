@@ -13,8 +13,10 @@
  * - **Admin Routes**: Support for admin-only routes with automatic redirect
  * - **Login Redirect**: Configurable login route or external URL with continue URL support
  */
+import { config } from "@/config/envConfig";
 import { appBaseLogger } from "@/lib/logger";
 import { buildRouteOrUrl } from "@/lib/routeOrUrl";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useUserStore } from "@/stores/userStore";
 import {
   createRouter,
@@ -209,6 +211,18 @@ export function createPrimitiveRouter(
         }
       );
       return { name: homeRouteName };
+    }
+
+    // Subscription gating: redirect expired users to the subscribe page.
+    // Skip for the subscribe route itself and when billing is disabled.
+    if (config.billingEnabled && to.name !== "subscribe") {
+      const subscription = useSubscriptionStore();
+      if (subscription.isReady && !subscription.hasAccess) {
+        logger.debug(
+          "Subscription expired; redirecting to subscribe page"
+        );
+        return { name: "subscribe" };
+      }
     }
 
     logger.debug("Access granted; continuing navigation");

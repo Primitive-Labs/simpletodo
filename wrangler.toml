@@ -26,10 +26,10 @@ not_found_handling = "single-page-application"
 # Config from: .env.production
 # =============================================================================
 [env.production]
-name = "simpletodo-prod"
+name = "simpletodo-prod-test"
 
 [[env.production.routes]]
-pattern = "simpletodo.primitive.app"
+pattern = "simpletodo-test.primitive.app"
 custom_domain = true
 
 [env.production.vars]
@@ -37,8 +37,21 @@ custom_domain = true
 REFRESH_PROXY_COOKIE_MAX_AGE = "604800"
 REFRESH_PROXY_COOKIE_PATH = "/proxy/"
 
+# Billing defaults (STRIPE_PRICE_ID and APP_URL come from .env.production via deploy script)
+TRIAL_DAYS = "0"
+
 # Note: APP_ID and API_ORIGIN are read from .env.production by the deploy script
 # and passed to wrangler via --var flags. Do not duplicate them here.
+# Note: STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET must be set as secrets:
+#   wrangler secret put STRIPE_SECRET_KEY --env production
+#   wrangler secret put STRIPE_WEBHOOK_SECRET --env production
+
+# Billing KV namespace — create with:
+#   wrangler kv namespace create BILLING_KV --env production
+# Then paste the id below.
+[[env.production.kv_namespaces]]
+binding = "BILLING_KV"
+id = "47015aef503941e8a69fecf9ba4c1148"
 
 # =============================================================================
 # ADDITIONAL ENVIRONMENTS

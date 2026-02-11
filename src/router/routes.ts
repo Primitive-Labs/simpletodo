@@ -10,6 +10,7 @@ import HomeRedirectPage from "../pages/HomeRedirectPage.vue";
 import TodoListPage from "../pages/TodoListPage.vue";
 import ManageListsPage from "../pages/ManageListsPage.vue";
 import SearchPage from "../pages/SearchPage.vue";
+import SubscribePage from "../pages/SubscribePage.vue";
 import LoginPage from "../pages/LoginPage.vue";
 import NotFoundPage from "../pages/NotFoundPage.vue";
 
@@ -68,6 +69,16 @@ const routes: RouteRecordRaw[] = [
     path: "/",
     component: LoginLayout,
     children: [
+      {
+        path: "subscribe",
+        name: "subscribe",
+        component: SubscribePage,
+        meta: {
+          primitiveRouterMeta: {
+            requireAuth: "member",
+          },
+        },
+      },
       {
         path: "login",
         name: "login",
