@@ -21,6 +21,8 @@ export interface TabBarItem {
   icon: Component;
   /** Route path to navigate to */
   path: string;
+  /** Optional badge count to display on the item */
+  badge?: number;
 }
 
 interface Props {
@@ -62,7 +64,15 @@ const isActiveRoute = computed(() => (path: string) => {
             : 'text-sidebar-foreground/60 hover:text-sidebar-foreground'
         "
       >
-        <component :is="item.icon" class="h-5 w-5" />
+        <div class="relative">
+          <component :is="item.icon" class="h-5 w-5" />
+          <span
+            v-if="item.badge && item.badge > 0"
+            class="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium text-white"
+          >
+            {{ item.badge > 99 ? "99+" : item.badge }}
+          </span>
+        </div>
         <span class="text-xs mt-1">{{ item.label }}</span>
       </RouterLink>
 

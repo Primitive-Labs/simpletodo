@@ -12,7 +12,14 @@
 import AppSidebar from "@/components/AppSidebar.vue";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useMediaQuery } from "@vueuse/core";
-import { Key, User, Search, ListTodo, CheckSquare, LogOut } from "lucide-vue-next";
+import {
+  Key,
+  User,
+  Search,
+  ListTodo,
+  CheckSquare,
+  LogOut,
+} from "lucide-vue-next";
 import EditProfile from "@/components/auth/EditProfile.vue";
 import PasskeyManagement from "@/components/auth/PasskeyManagement.vue";
 import PrimitiveMobileTabBar, {
@@ -22,6 +29,7 @@ import PrimitiveUserTabItem, {
   type UserTabMenuItem,
   type UserTabUserInfo,
 } from "@/components/shared/PrimitiveUserTabItem.vue";
+import { useJsBaoDocumentsStore } from "@/stores/jsBaoDocumentsStore";
 import { useUserStore } from "@/stores/userStore";
 import { useTodoStore } from "@/stores/todoStore";
 import { TodoList } from "@/models";
@@ -31,6 +39,7 @@ import { useJsBaoDataLoader } from "@/composables/useJsBaoDataLoader";
 const isMobile = useMediaQuery("(max-width: 768px)");
 
 // User store for mobile user menu
+const documentsStore = useJsBaoDocumentsStore();
 const userStore = useUserStore();
 const todoStore = useTodoStore();
 
@@ -87,8 +96,19 @@ const mobileNavItems = computed<TabBarItem[]>(() => {
   }
 
   // Always show Search and Lists
-  items.push({ name: "search", label: "Search", icon: Search, path: "/search" });
-  items.push({ name: "lists", label: "Lists", icon: ListTodo, path: "/lists" });
+  items.push({
+    name: "search",
+    label: "Search",
+    icon: Search,
+    path: "/search",
+  });
+  items.push({
+    name: "lists",
+    label: "Lists",
+    icon: ListTodo,
+    path: "/lists",
+    badge: documentsStore.pendingInvitationCount,
+  });
 
   return items;
 });

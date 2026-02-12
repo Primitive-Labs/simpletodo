@@ -43,9 +43,9 @@ import type {
   InvitationEvent,
 } from "js-bao-wss-client";
 import { defineStore } from "pinia";
+import { jsBaoClientService } from "primitive-app";
 import { computed, ref } from "vue";
 import { appBaseLogger } from "../lib/logger";
-import { jsBaoClientService } from "primitive-app";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -152,6 +152,13 @@ export const useJsBaoDocumentsStore = defineStore("jsBaoDocuments", () => {
    */
   const isReady = computed(
     () => documentListLoaded.value && invitationListLoaded.value
+  );
+
+  /**
+   * Number of pending invitations awaiting user action.
+   */
+  const pendingInvitationCount = computed(
+    () => pendingInvitations.value.length
   );
 
   // -------------------------------------------------------------------------
@@ -1353,6 +1360,7 @@ export const useJsBaoDocumentsStore = defineStore("jsBaoDocuments", () => {
 
     // getters
     isReady,
+    pendingInvitationCount,
 
     // actions
     initialize,

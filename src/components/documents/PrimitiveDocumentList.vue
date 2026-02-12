@@ -9,6 +9,7 @@ import Card from "@/components/ui/card/Card.vue";
 import CardContent from "@/components/ui/card/CardContent.vue";
 import Dialog from "@/components/ui/dialog/Dialog.vue";
 import DialogContent from "@/components/ui/dialog/DialogContent.vue";
+import DialogDescription from "@/components/ui/dialog/DialogDescription.vue";
 import DialogFooter from "@/components/ui/dialog/DialogFooter.vue";
 import DialogHeader from "@/components/ui/dialog/DialogHeader.vue";
 import DialogTitle from "@/components/ui/dialog/DialogTitle.vue";
@@ -20,6 +21,7 @@ import Input from "@/components/ui/input/Input.vue";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
@@ -38,6 +40,7 @@ import { useMediaQuery } from "@vueuse/core";
 import type {
   DocumentInfo,
   DocumentMetadataChangedEvent,
+  InvitationEvent,
 } from "js-bao-wss-client";
 import {
   Check,
@@ -189,14 +192,16 @@ const loadInvitations = async (): Promise<void> => {
 
 // Track event listener cleanup
 let metadataChangeUnsubscribe: (() => void) | null = null;
+let invitationUnsubscribe: (() => void) | null = null;
 
 // Load data on mount and set up event listeners
 onMounted(async () => {
   await Promise.all([loadDocuments(), loadInvitations()]);
 
-  // Listen for document metadata changes to auto-refresh the list
   const client = await jsBaoClientService.getClientAsync();
-  const handler = (event: DocumentMetadataChangedEvent) => {
+
+  // Listen for document metadata changes to auto-refresh the list
+  const metadataHandler = (event: DocumentMetadataChangedEvent) => {
     const action = event.action;
     // Refresh list when documents are created, updated, or deleted
     if (action === "created" || action === "updated" || action === "deleted") {
@@ -207,9 +212,20 @@ onMounted(async () => {
       loadDocuments();
     }
   };
-  client.on("documentMetadataChanged", handler);
+  client.on("documentMetadataChanged", metadataHandler);
   metadataChangeUnsubscribe = () =>
-    client.off("documentMetadataChanged", handler);
+    client.off("documentMetadataChanged", metadataHandler);
+
+  // Listen for invitation changes to auto-refresh the invitations list
+  const invitationHandler = (event: InvitationEvent) => {
+    logger.debug("Invitation event received, refreshing invitations", {
+      action: event.action,
+      documentId: event.documentId,
+    });
+    loadInvitations();
+  };
+  client.on("invitation", invitationHandler);
+  invitationUnsubscribe = () => client.off("invitation", invitationHandler);
 });
 
 // Clean up event listeners on unmount
@@ -217,6 +233,10 @@ onUnmounted(() => {
   if (metadataChangeUnsubscribe) {
     metadataChangeUnsubscribe();
     metadataChangeUnsubscribe = null;
+  }
+  if (invitationUnsubscribe) {
+    invitationUnsubscribe();
+    invitationUnsubscribe = null;
   }
 });
 
@@ -322,7 +342,7 @@ const handleDelete = async (docId: string) => {
   try {
     logger.debug("Deleting document", { documentId: docId });
     const client = await jsBaoClientService.getClientAsync();
-    await client.documents.delete(docId);
+    await client.documents.delete(docId, { forceCloseIfOpen: true });
     // Remove from local list
     documents.value = documents.value.filter((doc) => doc.documentId !== docId);
     deleteDocId.value = null;
@@ -925,18 +945,12 @@ const handleClearLocalCache = async () => {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Confirm Delete {{ props.documentName }}</DialogTitle>
-        </DialogHeader>
-        <div class="space-y-2">
-          <p>
+          <DialogDescription>
             Are you sure you want to delete this
-            {{ props.documentName.toLowerCase() }}?
-          </p>
-          <p class="text-sm text-destructive">
-            Warning: This will permanently delete the
-            {{ props.documentName.toLowerCase() }}. This action cannot be
-            undone.
-          </p>
-        </div>
+            {{ props.documentName.toLowerCase() }}? This will permanently delete
+            the {{ props.documentName.toLowerCase() }} and cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
         <DialogFooter>
           <Button
             variant="outline"
@@ -965,19 +979,13 @@ const handleClearLocalCache = async () => {
       <SheetContent side="bottom">
         <SheetHeader>
           <SheetTitle>Confirm Delete {{ props.documentName }}</SheetTitle>
-        </SheetHeader>
-        <div class="space-y-2 px-4 py-4">
-          <p>
+          <SheetDescription>
             Are you sure you want to delete this
-            {{ props.documentName.toLowerCase() }}?
-          </p>
-          <p class="text-sm text-destructive">
-            Warning: This will permanently delete the
-            {{ props.documentName.toLowerCase() }}. This action cannot be
-            undone.
-          </p>
-        </div>
-        <SheetFooter class="flex-col gap-2 sm:flex-col">
+            {{ props.documentName.toLowerCase() }}? This will permanently delete
+            the {{ props.documentName.toLowerCase() }} and cannot be undone.
+          </SheetDescription>
+        </SheetHeader>
+        <SheetFooter class="flex-col gap-2 sm:flex-col px-4 pt-4">
           <Button
             variant="destructive"
             class="w-full"

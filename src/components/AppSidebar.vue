@@ -34,6 +34,7 @@ import {
   Plus,
   Settings,
 } from "lucide-vue-next";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -47,6 +48,7 @@ import {
 import PrimitiveUserMenu, {
   type UserMenuItem,
 } from "@/components/shared/PrimitiveUserMenu.vue";
+import { useJsBaoDocumentsStore } from "@/stores/jsBaoDocumentsStore";
 import { useUserStore } from "@/stores/userStore";
 import { useTodoStore } from "@/stores/todoStore";
 import { useJsBaoDataLoader } from "@/composables/useJsBaoDataLoader";
@@ -78,11 +80,14 @@ const props = withDefaults(defineProps<Props>(), {
 });
 const emit = defineEmits<Emits>();
 
+const documentsStore = useJsBaoDocumentsStore();
 const userStore = useUserStore();
 const todoStore = useTodoStore();
 const route = useRoute();
 const router = useRouter();
 const { isMobile } = useSidebar();
+
+const pendingInvitationCount = computed(() => documentsStore.pendingInvitationCount);
 
 const showCreateDialog = ref(false);
 const newListTitle = ref("");
@@ -249,9 +254,22 @@ function isListActive(listId: string): boolean {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton as-child :is-active="route.path === '/lists'">
-                <RouterLink to="/lists" @click="handleNavClick">
-                  <Settings />
-                  <span>Manage Lists</span>
+                <RouterLink
+                  to="/lists"
+                  class="flex w-full items-center justify-between"
+                  @click="handleNavClick"
+                >
+                  <span class="flex items-center gap-2">
+                    <Settings class="size-4 shrink-0" />
+                    <span>Manage Lists</span>
+                  </span>
+                  <Badge
+                    v-if="pendingInvitationCount > 0"
+                    variant="destructive"
+                    class="ml-auto h-5 min-w-5 px-1.5"
+                  >
+                    {{ pendingInvitationCount }}
+                  </Badge>
                 </RouterLink>
               </SidebarMenuButton>
             </SidebarMenuItem>

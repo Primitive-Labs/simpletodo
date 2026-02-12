@@ -3,23 +3,27 @@
  * Home redirect page that navigates users to their appropriate todo list.
  *
  * On load, this page:
- * 1. Waits for the todo collection to be ready
- * 2. Checks for a last used list in user preferences
- * 3. If no valid last used list, gets or creates the default "My List"
- * 4. Redirects to the appropriate list
+ * 1. Waits for the documents store to be ready (document list loaded)
+ * 2. Gets the startup list (opens only the needed document)
+ * 3. Redirects to the appropriate list
+ *
+ * Note: We wait for documentsStore.isReady (document list loaded) rather than
+ * todoStore.isCollectionReady (all documents opened) to minimize startup time.
  */
 import { computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { Skeleton } from "@/components/ui/skeleton";
 import PrimitiveLoadingGate from "@/components/shared/PrimitiveLoadingGate.vue";
+import { useJsBaoDocumentsStore } from "@/stores/jsBaoDocumentsStore";
 import { useTodoStore } from "@/stores/todoStore";
 
 const router = useRouter();
+const documentsStore = useJsBaoDocumentsStore();
 const todoStore = useTodoStore();
 
-const isReady = computed(() => todoStore.isCollectionReady);
+const isReady = computed(() => documentsStore.isReady);
 
-// When the collection is ready, determine which list to navigate to
+// When documents store is ready, determine which list to navigate to
 watch(
   isReady,
   async (ready) => {

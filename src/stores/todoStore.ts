@@ -25,8 +25,13 @@ const logger = createLogger({ scope: "todoStore" });
 const COLLECTION_NAME = "todolists";
 const COLLECTION_TAG = "todolist";
 const DEFAULT_LIST_ALIAS = "default-list";
-const LAST_USED_LIST_PREF = "lastUsedListId";
+const LAST_USED_LIST_PREF = "lastUsedList";
 const RECENT_LISTS_PREF = "recentListIds";
+
+interface LastUsedList {
+  listId: string;
+  documentId: string;
+}
 
 let initStarted = false;
 
@@ -84,21 +89,6 @@ export const useTodoStore = defineStore("todo", () => {
     // Initialize documentsStore first (required for multiDocumentStore)
     logger.debug("Initializing documentsStore");
     await documentsStore.initialize();
-
-    // Wait for documents store to be ready
-    if (!documentsStore.isReady) {
-      logger.debug("Waiting for documentsStore to be ready");
-      await new Promise<void>((resolve) => {
-        const checkReady = () => {
-          if (documentsStore.isReady) {
-            resolve();
-          } else {
-            setTimeout(checkReady, 50);
-          }
-        };
-        checkReady();
-      });
-    }
 
     // Register the todolists collection
     if (!multiDocStore.isCollectionRegistered(COLLECTION_NAME)) {
@@ -348,18 +338,30 @@ export const useTodoStore = defineStore("todo", () => {
   const userStore = useUserStore();
 
   /**
-   * Get the last used list ID from user preferences.
+   * Get the last used list from user preferences.
    */
-  function getLastUsedListId(): string | null {
-    return userStore.getPref<string | null>(LAST_USED_LIST_PREF, null);
+  function getLastUsedList(): LastUsedList | null {
+    return userStore.getPref<LastUsedList | null>(LAST_USED_LIST_PREF, null);
   }
 
   /**
-   * Set the last used list ID in user preferences.
+   * Get the last used list ID from user preferences.
+   * @deprecated Use getLastUsedList() instead
    */
-  async function setLastUsedListId(listId: string): Promise<void> {
-    logger.debug("Setting last used list", { listId });
-    await userStore.setPref(LAST_USED_LIST_PREF, listId);
+  function getLastUsedListId(): string | null {
+    const lastUsed = getLastUsedList();
+    return lastUsed?.listId ?? null;
+  }
+
+  /**
+   * Set the last used list in user preferences.
+   */
+  async function setLastUsedListId(
+    listId: string,
+    documentId: string
+  ): Promise<void> {
+    logger.debug("Setting last used list", { listId, documentId });
+    await userStore.setPref(LAST_USED_LIST_PREF, { listId, documentId });
     // Also update recent lists
     await addToRecentLists(listId);
   }
@@ -423,24 +425,27 @@ export const useTodoStore = defineStore("todo", () => {
       defaultListLogger.debug("Default list not found, creating new one");
     }
 
-    // Create new document with alias atomically using multiDocStore
-    // This ensures the document is properly opened and tracked
+    // Create new document with alias atomically using the client directly
+    // This avoids requiring the collection to be registered first
     try {
-      const trackedDoc = await multiDocStore.createDocument(
-        COLLECTION_NAME,
-        "My List",
-        { alias: aliasParams }
-      );
+      const client = await jsBaoClientService.getClientAsync();
+      const result = await client.documents.createWithAlias({
+        title: "My List",
+        alias: aliasParams,
+      });
+
+      // Open the newly created document
+      await client.documents.open(result.documentId);
 
       // Create the TodoList model inside the document
       const todoList = new TodoList();
       todoList.title = "My List";
       todoList.createdAt = new Date().toISOString();
-      await todoList.save({ targetDocument: trackedDoc.documentId });
+      await todoList.save({ targetDocument: result.documentId });
 
       defaultListLogger.debug("Created default list", {
         listId: todoList.id,
-        documentId: trackedDoc.documentId,
+        documentId: result.documentId,
       });
 
       return todoList.id;
@@ -469,21 +474,34 @@ export const useTodoStore = defineStore("todo", () => {
   /**
    * Get the list to navigate to on app load.
    * Returns the last used list if valid, otherwise creates/gets the default list.
+   * Opens only the needed document rather than waiting for all documents.
    */
   async function getStartupListId(): Promise<string> {
     const startupLogger = logger.forScope("getStartupListId");
     startupLogger.debug("Determining startup list");
 
-    // Check for last used list
-    const lastUsedId = getLastUsedListId();
-    if (lastUsedId) {
-      // Verify the list still exists
-      const result = await TodoList.query({ id: lastUsedId });
-      if (result.data[0]) {
-        startupLogger.debug("Using last used list", { listId: lastUsedId });
-        return lastUsedId;
+    // Check for last used list with document ID
+    const lastUsed = getLastUsedList();
+    if (lastUsed?.listId && lastUsed?.documentId) {
+      try {
+        // Open just this specific document
+        startupLogger.debug("Opening last used document", {
+          documentId: lastUsed.documentId,
+        });
+        await documentsStore.openDocument(lastUsed.documentId);
+
+        // Verify the list still exists
+        const result = await TodoList.query({ id: lastUsed.listId });
+        if (result.data[0]) {
+          startupLogger.debug("Using last used list", {
+            listId: lastUsed.listId,
+          });
+          return lastUsed.listId;
+        }
+        startupLogger.debug("Last used list no longer exists in document");
+      } catch (err) {
+        startupLogger.debug("Failed to open last used document", { err });
       }
-      startupLogger.debug("Last used list no longer exists");
     }
 
     // Fall back to default list

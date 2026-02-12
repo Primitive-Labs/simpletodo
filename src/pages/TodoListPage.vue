@@ -121,15 +121,23 @@ watch(
   { immediate: true }
 );
 
-// Update todoStore current list and save as last used
+// Update todoStore current list
 watch(
   listId,
   (id) => {
     todoStore.setCurrentList(id);
-    // Save as last used list (fire and forget)
-    todoStore.setLastUsedListId(id);
   },
   { immediate: true }
+);
+
+// Save as last used list when we have the document ID
+watch(
+  [initialDataLoaded, currentDocumentId, listId],
+  ([loaded, docId, id]) => {
+    if (loaded && docId && id) {
+      todoStore.setLastUsedListId(id, docId);
+    }
+  }
 );
 
 async function handleAddTodo(text: string): Promise<void> {
@@ -286,9 +294,7 @@ async function handleDeleteList(): Promise<void> {
           <DialogTitle>Delete List</DialogTitle>
         </DialogHeader>
         <div class="space-y-2">
-          <p>
-            Are you sure you want to delete "{{ currentList?.title }}"?
-          </p>
+          <p>Are you sure you want to delete "{{ currentList?.title }}"?</p>
           <p class="text-sm text-destructive">
             Warning: This will permanently delete the list and all its items.
             This action cannot be undone.
@@ -324,9 +330,7 @@ async function handleDeleteList(): Promise<void> {
           <SheetTitle>Delete List</SheetTitle>
         </SheetHeader>
         <div class="px-4 py-4 space-y-2">
-          <p>
-            Are you sure you want to delete "{{ currentList?.title }}"?
-          </p>
+          <p>Are you sure you want to delete "{{ currentList?.title }}"?</p>
           <p class="text-sm text-destructive">
             Warning: This will permanently delete the list and all its items.
             This action cannot be undone.
