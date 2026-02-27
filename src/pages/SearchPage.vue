@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import PrimitiveLoadingGate from "@/components/shared/PrimitiveLoadingGate.vue";
 import { useJsBaoDataLoader } from "@/composables/useJsBaoDataLoader";
-import { useTodoStore } from "@/stores/todoStore";
+import { useMultiDocumentStore } from "@/stores/multiDocumentStore";
 import { TodoList, TodoItem } from "@/models";
 
 interface SearchResult {
@@ -18,12 +18,16 @@ interface SearchResult {
   listId: string;
 }
 
+const COLLECTION_NAME = "todolists";
+
 const router = useRouter();
-const todoStore = useTodoStore();
+const multiDocStore = useMultiDocumentStore();
 
 const searchQuery = ref("");
 const showCompleted = ref(false);
-const documentReady = computed(() => todoStore.isCollectionReady);
+const documentReady = computed(() =>
+  multiDocStore.isCollectionReady(COLLECTION_NAME)
+);
 
 const { data, initialDataLoaded } = useJsBaoDataLoader<
   { results: SearchResult[] },

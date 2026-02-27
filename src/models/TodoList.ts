@@ -6,7 +6,6 @@ const todoListSchema = defineModelSchema({
     id: { type: "id", autoAssign: true, indexed: true },
     title: { type: "string", indexed: true },
     showCompleted: { type: "boolean", default: false },
-    createdAt: { type: "date" },
   },
 });
 // 🔥🔥 BEGIN AUTO-GENERATED HEADER (DO NOT EDIT) 🔥🔥

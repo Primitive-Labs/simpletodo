@@ -6,7 +6,7 @@ import PrimitiveOauthCallback from "@/components/auth/PrimitiveOauthCallback.vue
 import { createPrimitiveRouter } from "@/router/primitiveRouter";
 import type { RouteRecordRaw } from "vue-router";
 import { createWebHistory } from "vue-router";
-import HomeRedirectPage from "../pages/HomeRedirectPage.vue";
+import HomePage from "../pages/HomePage.vue";
 import TodoListPage from "../pages/TodoListPage.vue";
 import ManageListsPage from "../pages/ManageListsPage.vue";
 import SearchPage from "../pages/SearchPage.vue";
@@ -25,7 +25,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: "",
         name: "home",
-        component: HomeRedirectPage,
+        component: HomePage,
         meta: {
           primitiveRouterMeta: {
             requireAuth: "member",

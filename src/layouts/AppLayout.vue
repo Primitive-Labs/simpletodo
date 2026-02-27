@@ -31,71 +31,31 @@ import PrimitiveUserTabItem, {
 } from "@/components/shared/PrimitiveUserTabItem.vue";
 import { useJsBaoDocumentsStore } from "@/stores/jsBaoDocumentsStore";
 import { useUserStore } from "@/stores/userStore";
-import { useTodoStore } from "@/stores/todoStore";
-import { TodoList } from "@/models";
+import { useMultiDocumentStore } from "@/stores/multiDocumentStore";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useJsBaoDataLoader } from "@/composables/useJsBaoDataLoader";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger({ scope: "AppLayout" });
+const COLLECTION_NAME = "todolists";
+const COLLECTION_TAG = "todolist";
 
 const isMobile = useMediaQuery("(max-width: 768px)");
 
-// User store for mobile user menu
+// Stores
 const documentsStore = useJsBaoDocumentsStore();
 const userStore = useUserStore();
-const todoStore = useTodoStore();
+const multiDocStore = useMultiDocumentStore();
 
-// Load recent lists for mobile navigation
-const documentReady = computed(() => todoStore.isCollectionReady);
-const recentListIds = computed(() => todoStore.getRecentListIds());
-
-interface RecentListData {
-  lists: Array<{ id: string; title: string }>;
-}
-
-const { data: recentListsData } = useJsBaoDataLoader<
-  RecentListData,
-  { listIds: string[] }
->({
-  subscribeTo: [TodoList],
-  queryParams: computed(() => ({
-    listIds: recentListIds.value,
-  })),
-  documentReady,
-  async loadData({ queryParams }) {
-    const listIds = queryParams?.listIds ?? [];
-    if (listIds.length === 0) {
-      return { lists: [] };
-    }
-
-    const result = await TodoList.query({ id: { $in: listIds } });
-    // Preserve order from recentListIds
-    const listsById = new Map(result.data.map((l) => [l.id, l]));
-    const lists = listIds
-      .map((id) => {
-        const list = listsById.get(id);
-        return list ? { id: list.id, title: list.title } : null;
-      })
-      .filter((l): l is { id: string; title: string } => l !== null);
-
-    return { lists };
-  },
-});
-
-// Dynamic mobile nav items with recent lists
+// Mobile nav items
 const mobileNavItems = computed<TabBarItem[]>(() => {
   const items: TabBarItem[] = [];
 
-  // Add the most recently used list
-  const recentLists = recentListsData.value?.lists ?? [];
-  for (const list of recentLists.slice(0, 1)) {
-    items.push({
-      name: `list-${list.id}`,
-      label: list.title.length > 10 ? list.title.slice(0, 9) + "…" : list.title,
-      icon: CheckSquare,
-      path: `/list/${list.id}`,
-    });
-  }
-
-  // Always show Search and Lists
+  items.push({
+    name: "home",
+    label: "Home",
+    icon: ListTodo,
+    path: "/",
+  });
   items.push({
     name: "search",
     label: "Search",
@@ -105,7 +65,7 @@ const mobileNavItems = computed<TabBarItem[]>(() => {
   items.push({
     name: "lists",
     label: "Lists",
-    icon: ListTodo,
+    icon: CheckSquare,
     path: "/lists",
     badge: documentsStore.pendingInvitationCount,
   });
@@ -113,14 +73,22 @@ const mobileNavItems = computed<TabBarItem[]>(() => {
   return items;
 });
 
-// Initialize todoStore when authenticated
+// Initialize multiDocStore and register collection when authenticated
 watch(
   () => userStore.isAuthenticated,
-  (isAuthenticated) => {
+  async (isAuthenticated) => {
     if (isAuthenticated) {
-      todoStore.initialize();
-    } else {
-      todoStore.reset();
+      logger.debug("User authenticated, initializing todolist collection");
+      await multiDocStore.initialize();
+      if (!multiDocStore.isCollectionRegistered(COLLECTION_NAME)) {
+        await multiDocStore.registerCollection({
+          name: COLLECTION_NAME,
+          tag: COLLECTION_TAG,
+          autoOpen: true,
+          autoAcceptInvites: false,
+        });
+        logger.debug("Todolist collection registered");
+      }
     }
   },
   { immediate: true }

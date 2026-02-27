@@ -13,10 +13,9 @@ import {
 } from "@/components/ui/sheet";
 import PrimitiveDocumentList from "@/components/documents/PrimitiveDocumentList.vue";
 import { TodoList } from "@/models";
-import { useTodoStore } from "@/stores/todoStore";
+import { createList } from "@/lib/listOperations";
 
 const router = useRouter();
-const todoStore = useTodoStore();
 
 // Create list state
 const showCreateSheet = ref(false);
@@ -29,7 +28,7 @@ async function handleCreateList(): Promise<void> {
 
   isCreating.value = true;
   try {
-    const listId = await todoStore.createTodoList(title);
+    const { listId } = await createList(title);
     showCreateSheet.value = false;
     newListTitle.value = "";
     router.push({ name: "todo-list", params: { listId } });

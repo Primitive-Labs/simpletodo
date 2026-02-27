@@ -9,7 +9,6 @@ const todoItemSchema = defineModelSchema({
     completed: { type: "boolean", default: false, indexed: true },
     order: { type: "number", default: 0, indexed: true },
     completedAt: { type: "date" },
-    createdAt: { type: "date" },
   },
 });
 // 🔥🔥 BEGIN AUTO-GENERATED HEADER (DO NOT EDIT) 🔥🔥

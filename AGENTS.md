@@ -50,15 +50,14 @@
 
 - Primitive-app (the library) provides: jsBaoClientService for initializing js-bao, dev tools (test harness, document explorer), and shared UI components (PrimitiveLoadingGate, PrimitiveLogoSpinner, DeleteConfirmationDialog).
 - This project includes additional Pinia stores (in `/src/stores`) and document components (in `/src/components/documents`) that may be helpful in implementing common use patterns. They can be used as is, customized as needed, or removed in favor of application specific code.
-- Refer to the Primitive Docs and guidelines in @./docs/AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md, @./node_modules/js-bao/README.md and @./node_modules/js-bao-wss-client/README.md for additional context on using these libraries.
 - The `primitive-admin` CLI tool (accessible via the `primitive` command) provides command-line integration with the Primitive Admin server for managing apps, users, and other admin tasks.
 - ALWAYS use the js-bao-wss-client library to make API requests. NEVER hit http endpoints directly to accomplish tasks with js-bao.
-- The @docs directory provides guides and design patterns for common usage scenarios.
+- ALWAYS refer to the guides for js-bao, js-bao-wss-client, or primitive before writing code with these libraries. You can access guides via the primitive CLI. Use `primitive guides list` to see available topics and `primitive guides get TOPIC_NAME` to retrieve a specific guide.
 
 ### Data Storage and Loading
 
 - ALWAYS use js-bao for data persistence, and the js-bao-wss-client for interacting with the backend (auth, API calls, opening/closing js-bao documents, storing blobs, etc.).
-- The **root document** is a special per-user document that is automatically created and can never be shared or deleted (there is exactly one per user). The primitive template uses it to store user preferences via `userStore`, making settings automatically available whenever the user signs in. While the root document can hold any js-bao model, we recommend storing most application data in regular documents for greater flexibility (sharing, collaboration, multiple documents, etc.). See @./docs/AGENT_GUIDE_TO_PRIMITIVE_DOCUMENTS.md for details.
+- The **root document** is a special per-user document that is automatically created and can never be shared or deleted (there is exactly one per user). The primitive template uses it to store user preferences via `userStore`, making settings automatically available whenever the user signs in. While the root document can hold any js-bao model, we recommend storing most application data in regular documents for greater flexibility (sharing, collaboration, multiple documents, etc.). Run `primitive guides get documents` for details.
 
 ### Creating New js-bao Models
 
@@ -134,4 +133,4 @@ export class Todo extends BaseModel {
 
 ## Writing Tests
 
-- ALWAYS use the primitive-app test harness to write browser based tests for business logic in lib files/functions. For EVERY new lib file/function you create or update write tests that cover key cases. Refer to the Primitive Docs at https://primitive-labs.github.io/primitive-docs/ for examples.
+- ALWAYS use the primitive-app test harness to write browser based tests for business logic in lib files/functions. For EVERY new lib file/function you create or update write tests that cover key cases. Refer to the Primitive devtools guide available by running `primitive guides get devtools`.

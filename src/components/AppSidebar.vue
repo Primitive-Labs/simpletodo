@@ -50,11 +50,12 @@ import PrimitiveUserMenu, {
 } from "@/components/shared/PrimitiveUserMenu.vue";
 import { useJsBaoDocumentsStore } from "@/stores/jsBaoDocumentsStore";
 import { useUserStore } from "@/stores/userStore";
-import { useTodoStore } from "@/stores/todoStore";
+import { useMultiDocumentStore } from "@/stores/multiDocumentStore";
 import { useJsBaoDataLoader } from "@/composables/useJsBaoDataLoader";
 import { computed, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { TodoList } from "@/models";
+import { createList } from "@/lib/listOperations";
 
 interface ListItem {
   id: string;
@@ -80,20 +81,26 @@ const props = withDefaults(defineProps<Props>(), {
 });
 const emit = defineEmits<Emits>();
 
+const COLLECTION_NAME = "todolists";
+
 const documentsStore = useJsBaoDocumentsStore();
 const userStore = useUserStore();
-const todoStore = useTodoStore();
+const multiDocStore = useMultiDocumentStore();
 const route = useRoute();
 const router = useRouter();
 const { isMobile } = useSidebar();
 
-const pendingInvitationCount = computed(() => documentsStore.pendingInvitationCount);
+const pendingInvitationCount = computed(
+  () => documentsStore.pendingInvitationCount
+);
 
 const showCreateDialog = ref(false);
 const newListTitle = ref("");
 const isCreating = ref(false);
 
-const documentReady = computed(() => todoStore.isCollectionReady);
+const documentReady = computed(() =>
+  multiDocStore.isCollectionReady(COLLECTION_NAME)
+);
 
 // Load todo lists for sidebar navigation
 const { data: listsData } = useJsBaoDataLoader<{ lists: ListItem[] }>({
@@ -101,7 +108,7 @@ const { data: listsData } = useJsBaoDataLoader<{ lists: ListItem[] }>({
   queryParams: computed(() => ({})),
   documentReady,
   async loadData() {
-    const result = await TodoList.query({}, { sort: { createdAt: -1 } });
+    const result = await TodoList.query({}, { sort: { title: 1 } });
     return {
       lists: result.data.map((list) => ({
         id: list.id,
@@ -153,7 +160,7 @@ async function handleCreateList(): Promise<void> {
 
   isCreating.value = true;
   try {
-    const listId = await todoStore.createTodoList(title);
+    const { listId } = await createList(title);
     showCreateDialog.value = false;
     newListTitle.value = "";
     emit("navigate");

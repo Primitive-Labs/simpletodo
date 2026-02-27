@@ -95,6 +95,7 @@ interface RegisteredCollection {
 // Module-scoped lifecycle resources
 // ---------------------------------------------------------------------------
 
+let initStarted = false;
 let stopDocumentsWatcher: WatchStopHandle | null = null;
 let stopInvitationWatcher: WatchStopHandle | null = null;
 
@@ -139,11 +140,41 @@ export const useMultiDocumentStore = defineStore("multiDocument", () => {
   });
 
   // -------------------------------------------------------------------------
+  // Lifecycle
+  // -------------------------------------------------------------------------
+
+  /**
+   * Initialize the multi-document store.
+   * Ensures the underlying jsBaoDocumentsStore is initialized (document list
+   * loaded, real-time listeners registered) before any collections are used.
+   * This is typically called once after authentication succeeds.
+   */
+  async function initialize(): Promise<void> {
+    const initLogger = logger.forScope("initialize");
+    if (initStarted) {
+      initLogger.debug("Already initialized; skipping");
+      return;
+    }
+    initStarted = true;
+
+    try {
+      initLogger.debug("Initialization started");
+      const documentsStore = useJsBaoDocumentsStore();
+      await documentsStore.initialize();
+      initLogger.debug("Initialization complete");
+    } catch (error) {
+      initLogger.error("Initialization error", error);
+      throw error;
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Collection management
   // -------------------------------------------------------------------------
 
   /**
    * Register a new document collection.
+   * Requires initialize() to have been called first.
    * If autoOpen is true (default), all matching documents will be opened.
    */
   async function registerCollection(config: CollectionConfig): Promise<void> {
@@ -452,10 +483,6 @@ export const useMultiDocumentStore = defineStore("multiDocument", () => {
     });
   }
 
-  // -------------------------------------------------------------------------
-  // Lifecycle
-  // -------------------------------------------------------------------------
-
   /**
    * Reset the store, unregistering all collections and closing their documents.
    * Call this when the user logs out.
@@ -485,6 +512,10 @@ export const useMultiDocumentStore = defineStore("multiDocument", () => {
 
     // Clean up listeners
     cleanupListeners();
+
+    // Reset the documents store and allow re-initialization
+    documentsStore.reset();
+    initStarted = false;
 
     resetLogger.debug("Reset complete");
   }
@@ -997,6 +1028,7 @@ export const useMultiDocumentStore = defineStore("multiDocument", () => {
     getDocumentReadyRef,
 
     // actions
+    initialize,
     registerCollection,
     unregisterCollection,
     createDocument,

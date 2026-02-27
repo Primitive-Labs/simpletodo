@@ -25,8 +25,10 @@ import PrimitiveShareDocumentDialog from "@/components/documents/PrimitiveShareD
 import TodoInput from "@/components/todos/TodoInput.vue";
 import TodoList from "@/components/todos/TodoList.vue";
 import { useJsBaoDataLoader } from "@/composables/useJsBaoDataLoader";
-import { useTodoStore } from "@/stores/todoStore";
+import { useMultiDocumentStore } from "@/stores/multiDocumentStore";
 import { TodoList as TodoListModel, TodoItem } from "@/models";
+
+const COLLECTION_NAME = "todolists";
 
 interface LoadedData {
   list: InstanceType<typeof TodoListModel> | null;
@@ -36,7 +38,7 @@ interface LoadedData {
 
 const route = useRoute();
 const router = useRouter();
-const todoStore = useTodoStore();
+const multiDocStore = useMultiDocumentStore();
 const isMobile = useMediaQuery("(max-width: 640px)");
 
 const showShareDialog = ref(false);
@@ -44,11 +46,19 @@ const showDeleteSheet = ref(false);
 const isDeleting = ref(false);
 const pauseUpdates = ref(false);
 
-// URL template for share invitations - links to manage lists page where user can accept
+// Animation state for completing items
+const completingItems = ref<Set<string>>(new Set());
+
+// URL template for share invitations
 const inviteUrlTemplate = `${window.location.origin}/lists`;
 
 const listId = computed(() => route.params.listId as string);
-const documentReady = computed(() => todoStore.isCollectionReady);
+const documentReady = computed(() =>
+  multiDocStore.isCollectionReady(COLLECTION_NAME)
+);
+const todoListDocuments = computed(() =>
+  multiDocStore.getCollection(COLLECTION_NAME)
+);
 
 const { data, initialDataLoaded, reload } = useJsBaoDataLoader<
   LoadedData,
@@ -96,7 +106,7 @@ const showCompleted = computed(() => currentList.value?.showCompleted ?? false);
 
 const isReadOnly = computed(() => {
   if (!currentDocumentId.value) return true;
-  const doc = todoStore.todoListDocuments.find(
+  const doc = todoListDocuments.value.find(
     (d) => d.documentId === currentDocumentId.value
   );
   return doc?.permission === "reader";
@@ -104,7 +114,7 @@ const isReadOnly = computed(() => {
 
 const isOwner = computed(() => {
   if (!currentDocumentId.value) return false;
-  const doc = todoStore.todoListDocuments.find(
+  const doc = todoListDocuments.value.find(
     (d) => d.documentId === currentDocumentId.value
   );
   return doc?.permission === "owner";
@@ -121,46 +131,97 @@ watch(
   { immediate: true }
 );
 
-// Update todoStore current list
-watch(
-  listId,
-  (id) => {
-    todoStore.setCurrentList(id);
-  },
-  { immediate: true }
-);
-
-// Save as last used list when we have the document ID
-watch(
-  [initialDataLoaded, currentDocumentId, listId],
-  ([loaded, docId, id]) => {
-    if (loaded && docId && id) {
-      todoStore.setLastUsedListId(id, docId);
-    }
-  }
-);
+// ---------------------------------------------------------------------------
+// Todo Item Operations
+// ---------------------------------------------------------------------------
 
 async function handleAddTodo(text: string): Promise<void> {
   if (!currentList.value || !currentDocumentId.value) return;
-  await todoStore.addTodo(currentList.value.id, text, currentDocumentId.value);
+
+  // Get max order for this list
+  const existingItems = await TodoItem.query(
+    { listId: currentList.value.id, completed: false },
+    { sort: { order: -1 }, limit: 1 }
+  );
+  const maxOrder = existingItems.data[0]?.order ?? 0;
+
+  const todo = new TodoItem();
+  todo.listId = currentList.value.id;
+  todo.text = text;
+  todo.completed = false;
+  todo.order = maxOrder + 1;
+  await todo.save({ targetDocument: currentDocumentId.value });
 }
 
 async function handleToggleComplete(itemId: string): Promise<void> {
-  await todoStore.toggleTodoComplete(itemId);
+  const result = await TodoItem.query({ id: itemId });
+  const item = result.data[0];
+  if (!item) return;
+
+  if (!item.completed) {
+    // Starting completion - add to animating set
+    completingItems.value = new Set([...completingItems.value, itemId]);
+
+    // Wait for animation
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Now mark as completed
+    item.completed = true;
+    item.completedAt = new Date().toISOString();
+    await item.save();
+
+    // Remove from animating set
+    const newSet = new Set(completingItems.value);
+    newSet.delete(itemId);
+    completingItems.value = newSet;
+  } else {
+    // Uncompleting - immediate
+    item.completed = false;
+    item.completedAt = "";
+    await item.save();
+  }
 }
 
 async function handleDeleteTodo(itemId: string): Promise<void> {
-  await todoStore.deleteTodo(itemId);
+  const result = await TodoItem.query({ id: itemId });
+  const item = result.data[0];
+  if (item) {
+    await item.delete();
+  }
 }
 
 async function handleUpdateText(itemId: string, text: string): Promise<void> {
-  await todoStore.updateTodoText(itemId, text);
+  const result = await TodoItem.query({ id: itemId });
+  const item = result.data[0];
+  if (item) {
+    item.text = text;
+    await item.save();
+  }
 }
 
 async function handleReorder(itemIds: string[]): Promise<void> {
   pauseUpdates.value = true;
   try {
-    await todoStore.reorderTodos(itemIds);
+    const validIds = itemIds.filter((id): id is string => !!id);
+    if (validIds.length === 0) return;
+
+    const result = await TodoItem.query({ id: { $in: validIds } });
+    const itemsById = new Map(
+      result.data.map((item) => [item.id as string, item])
+    );
+
+    const savePromises: Promise<void>[] = [];
+    for (let i = 0; i < validIds.length; i++) {
+      const id = validIds[i];
+      if (!id) continue;
+      const item = itemsById.get(id);
+      if (item && item.order !== i) {
+        item.order = i;
+        savePromises.push(item.save());
+      }
+    }
+
+    await Promise.all(savePromises);
   } finally {
     pauseUpdates.value = false;
     reload();
@@ -169,11 +230,12 @@ async function handleReorder(itemIds: string[]): Promise<void> {
 
 async function handleToggleShowCompleted(): Promise<void> {
   if (!currentList.value) return;
-  await todoStore.toggleShowCompleted(currentList.value.id);
+  currentList.value.showCompleted = !currentList.value.showCompleted;
+  await currentList.value.save();
 }
 
 function isItemCompleting(itemId: string): boolean {
-  return todoStore.isItemCompleting(itemId);
+  return completingItems.value.has(itemId);
 }
 
 async function handleDeleteList(): Promise<void> {
@@ -183,7 +245,6 @@ async function handleDeleteList(): Promise<void> {
   try {
     const client = await jsBaoClientService.getClientAsync();
     const docId = currentDocumentId.value;
-    // Close the document first, then delete it
     await client.documents.close(docId);
     await client.documents.delete(docId);
     showDeleteSheet.value = false;
@@ -205,7 +266,7 @@ async function handleDeleteList(): Promise<void> {
           </template>
 
           <h1 class="text-xl font-semibold truncate">
-            {{ currentList?.title ?? "Loading..." }}
+            {{ currentList?.title ?? "List not found" }}
           </h1>
         </PrimitiveLoadingGate>
       </div>
